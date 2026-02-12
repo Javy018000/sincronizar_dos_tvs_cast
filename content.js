@@ -1,5 +1,7 @@
-// YouTube Dual Cast - Content Script (CORREGIDO v2)
-// Se inyecta en YouTube y agrega controles para cast dual
+// YouTube Dual Cast - Content Script (v3)
+// Se inyecta en YouTube. Maneja la UI (botón, panel).
+// Se comunica con page-script.js (MAIN world) via postMessage para Cast y Player API.
+// Se comunica con background.js via chrome.runtime para la segunda pestaña.
 
 (function () {
   'use strict';
@@ -16,55 +18,17 @@
     history.replaceState(null, '', cleanUrl.toString());
   }
 
-  // === INYECTAR SCRIPT EN EL CONTEXTO DE LA PÁGINA ===
-  // El content script NO puede acceder a las funciones JavaScript de YouTube.
-  // Pero YouTube expone pauseVideo(), playVideo(), seekTo(), getCurrentTime()
-  // en el elemento #movie_player. Esas funciones SÍ funcionan durante Cast activo.
-  // Este script inyectado corre en el contexto de la página y se comunica
-  // con el content script via window.postMessage.
-  function injectPageScript() {
-    if (document.getElementById('dualcast-injected')) return;
-    const script = document.createElement('script');
-    script.id = 'dualcast-injected';
-    script.textContent = `
-      (function() {
-        window.addEventListener('message', function(e) {
-          if (e.source !== window || !e.data || e.data.from !== 'dualcast') return;
-          var p = document.getElementById('movie_player');
-          if (!p) return;
-          try {
-            switch (e.data.cmd) {
-              case 'pause':  if (p.pauseVideo)    p.pauseVideo(); break;
-              case 'play':   if (p.playVideo)     p.playVideo();  break;
-              case 'seek':   if (p.seekTo)        p.seekTo(e.data.t, true); break;
-              case 'getTime':
-                window.postMessage({
-                  from: 'dualcast-page',
-                  cmd: 'time',
-                  t: p.getCurrentTime ? p.getCurrentTime() : 0
-                }, '*');
-                break;
-            }
-          } catch(err) {
-            console.error('DualCast injected script error:', err);
-          }
-        });
-      })();
-    `;
-    (document.head || document.documentElement).appendChild(script);
-  }
-
-  // Enviar comando a YouTube via el script inyectado
+  // === COMUNICACIÓN CON page-script.js (MAIN world) ===
+  // page-script.js tiene acceso a chrome.cast y YouTube Player API
   function ytCmd(cmd, data) {
-    window.postMessage({ from: 'dualcast', cmd: cmd, ...(data || {}) }, '*');
+    window.postMessage({ from: 'dc-content', cmd: cmd, ...(data || {}) }, '*');
   }
 
-  // Obtener tiempo actual del reproductor (funciona durante Cast)
   function ytGetTime() {
     return new Promise(function (resolve) {
       var done = false;
       function onMsg(e) {
-        if (e.data && e.data.from === 'dualcast-page' && e.data.cmd === 'time') {
+        if (e.data && e.data.from === 'dc-page' && e.data.cmd === 'time') {
           window.removeEventListener('message', onMsg);
           done = true;
           resolve(e.data.t);
@@ -82,51 +46,29 @@
     });
   }
 
-  // === ABRIR EL PICKER DE CAST ===
-  // Método 1: Remote Playback API (estándar de Chrome, no depende de la UI de YouTube)
-  // Método 2: Buscar botón de Cast de YouTube con múltiples selectores
-  // Método 3: Instrucciones manuales
-  function findCastButton() {
-    const selectors = [
-      'button.ytp-cast-button',
-      '.ytp-cast-button',
-      'button[data-tooltip-target-id="ytp-cast-button"]',
-      'google-cast-launcher',
-      'button[aria-label*="Cast"]',
-      'button[aria-label*="Transmitir"]',
-      'button[aria-label*="Enviar"]',
-    ];
-    for (const sel of selectors) {
-      const el = document.querySelector(sel);
-      if (el) return el;
-    }
-    return null;
-  }
-
-  async function openCastPicker() {
-    // Método 1: Remote Playback API
-    try {
-      const video = document.querySelector('video');
-      if (video && video.remote) {
-        await video.remote.prompt();
-        console.log('DualCast: Cast abierto via Remote Playback API');
-        return true;
+  // Escuchar eventos de Cast desde page-script.js
+  window.addEventListener('message', function (e) {
+    if (e.data && e.data.from === 'dc-page' && e.data.cmd === 'castEvent') {
+      switch (e.data.event) {
+        case 'castSuccess':
+          console.log('DualCast content: Cast conectado exitosamente');
+          updateStepStatus('dc-cast-tv1', 'Cast conectado a TV 1');
+          break;
+        case 'castError':
+          console.log('DualCast content: Cast error:', e.data.detail);
+          showNotification('Error al conectar Cast: ' + (e.data.detail || 'desconocido'));
+          break;
+        case 'castUnavailable':
+          console.log('DualCast content: Cast SDK no disponible');
+          showNotification('Cast no disponible. Usa el menu de Chrome (3 puntos) > Enviar para castear manualmente.');
+          break;
       }
-    } catch (e) {
-      console.log('DualCast: Remote Playback falló:', e.name, '-', e.message);
     }
-
-    // Método 2: Click en botón de YouTube
-    const btn = findCastButton();
-    if (btn) {
-      btn.click();
-      console.log('DualCast: Cast abierto via botón de YouTube');
-      return true;
+    // Diagnóstico
+    if (e.data && e.data.from === 'dc-page' && e.data.cmd === 'diagnosis') {
+      console.log('DualCast diagnosis:', e.data.info);
     }
-
-    console.log('DualCast: No se pudo abrir Cast automáticamente');
-    return false;
-  }
+  });
 
   // === OBSERVAR NAVEGACIÓN SPA DE YOUTUBE ===
   let lastUrl = location.href;
@@ -138,7 +80,6 @@
         dualCastPanel = null;
       }
       setTimeout(addDualCastButton, 1500);
-      setTimeout(injectPageScript, 1500);
     }
   });
   navObserver.observe(document.body, { childList: true, subtree: true });
@@ -182,6 +123,9 @@
   function createPanel() {
     const player = document.querySelector('#movie_player');
     if (!player) return;
+
+    // Pedir diagnóstico al cargar el panel
+    ytCmd('diagnoseCast');
 
     dualCastPanel = document.createElement('div');
     dualCastPanel.id = 'dual-cast-panel';
@@ -243,23 +187,20 @@
       dualCastPanel = null;
     });
 
-    document.getElementById('dc-cast-tv1').addEventListener('click', castToTV1);
+    // NOTA: El clic en dc-cast-tv1 es manejado por page-script.js (MAIN world)
+    // que tiene acceso a chrome.cast.requestSession(). El content script solo
+    // actualiza la UI cuando recibe el resultado via postMessage.
+    document.getElementById('dc-cast-tv1').addEventListener('click', () => {
+      updateStepStatus('dc-cast-tv1', 'Abriendo Cast...');
+    });
+
     document.getElementById('dc-cast-tv2').addEventListener('click', castToTV2);
     document.getElementById('dc-sync-btn').addEventListener('click', syncTime);
     document.getElementById('dc-pause-all-btn').addEventListener('click', pauseAll);
     document.getElementById('dc-play-all-btn').addEventListener('click', playAll);
   }
 
-  // === ACCIONES DE CAST ===
-
-  async function castToTV1() {
-    const ok = await openCastPicker();
-    if (ok) {
-      updateStepStatus('dc-cast-tv1', 'Cast abierto - selecciona TV 1');
-    } else {
-      showNotification('No se pudo abrir Cast. Haz clic manualmente en el icono de Cast del reproductor, o ve al menu de Chrome > Enviar.');
-    }
-  }
+  // === ACCIONES ===
 
   async function castToTV2() {
     const currentTime = await ytGetTime();
@@ -290,7 +231,7 @@
     });
   }
 
-  // === SINCRONIZACIÓN (usa YouTube Player API via script inyectado, funciona durante Cast) ===
+  // === SINCRONIZACIÓN (via YouTube Player API en page-script.js) ===
 
   async function syncTime() {
     const t = await ytGetTime();
@@ -373,7 +314,7 @@
     return m + ':' + (s < 10 ? '0' : '') + s;
   }
 
-  // === PESTAÑA SECUNDARIA: mostrar banner ===
+  // === PESTAÑA SECUNDARIA: banner ===
   if (isSecondaryTab) {
     setTimeout(() => {
       const banner = document.createElement('div');
@@ -385,11 +326,9 @@
       `;
       document.body.prepend(banner);
 
-      document.getElementById('dc-banner-cast').addEventListener('click', async () => {
-        const ok = await openCastPicker();
-        if (!ok) {
-          alert('No se pudo abrir Cast.\n\nHaz clic en el icono de Cast del reproductor de YouTube, o ve al menu de Chrome (3 puntos) > Enviar.');
-        }
+      // NOTA: El clic en dc-banner-cast es manejado por page-script.js
+      document.getElementById('dc-banner-cast').addEventListener('click', () => {
+        // Solo feedback visual, page-script.js maneja el Cast
       });
 
       document.getElementById('dc-banner-close').addEventListener('click', () => {
@@ -400,7 +339,6 @@
 
   // === INICIALIZAR ===
   function init() {
-    injectPageScript();
     setTimeout(addDualCastButton, 1500);
   }
 
