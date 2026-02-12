@@ -259,18 +259,23 @@
 
   // === ESCUCHAR COMANDOS DEL BACKGROUND (para la pestaña secundaria) ===
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    console.log('DualCast content: mensaje del background:', request.action);
+
     switch (request.action) {
       case 'syncTime':
+        console.log('DualCast content: seek a', request.currentTime);
         ytCmd('seek', { t: request.currentTime });
         sendResponse({ success: true });
         break;
 
       case 'pause':
+        console.log('DualCast content: enviando pause a page-script');
         ytCmd('pause');
         sendResponse({ success: true });
         break;
 
       case 'play':
+        console.log('DualCast content: enviando play a page-script');
         ytCmd('play');
         sendResponse({ success: true });
         break;
