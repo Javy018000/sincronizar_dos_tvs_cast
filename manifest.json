@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "YouTube Dual Cast",
+  "version": "1.0",
+  "description": "Transmite un video de YouTube a dos TVs simultáneamente desde una sola pestaña",
+
+  "permissions": [
+    "tabs",
+    "storage"
+  ],
+
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "YouTube Dual Cast"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["*://*.youtube.com/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_end"
+    }
+  ],
+
+  "background": {
+    "service_worker": "background.js"
+  }
+}
