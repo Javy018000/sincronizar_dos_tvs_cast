@@ -174,6 +174,19 @@
             <button class="dc-btn dc-btn-sync" id="dc-pause-all-btn">Pausar ambos</button>
             <button class="dc-btn dc-btn-sync" id="dc-play-all-btn">Reproducir ambos</button>
           </div>
+
+          <div class="dc-offset">
+            <label class="dc-offset-label">
+              Ajuste fino TV 2: <span id="dc-offset-value" class="dc-offset-val">0 ms</span>
+            </label>
+            <input type="range" id="dc-offset-slider" class="dc-offset-slider"
+              min="-2000" max="2000" value="0" step="50">
+            <div class="dc-offset-hints">
+              <span>-2s (atrasar)</span>
+              <span>+2s (adelantar)</span>
+            </div>
+          </div>
+
           <p class="dc-sync-status" id="dc-sync-status"></p>
         </div>
       </div>
@@ -198,6 +211,14 @@
     document.getElementById('dc-sync-btn').addEventListener('click', syncTime);
     document.getElementById('dc-pause-all-btn').addEventListener('click', pauseAll);
     document.getElementById('dc-play-all-btn').addEventListener('click', playAll);
+
+    // Slider de offset manual
+    const slider = document.getElementById('dc-offset-slider');
+    const offsetDisplay = document.getElementById('dc-offset-value');
+    slider.addEventListener('input', () => {
+      const ms = parseInt(slider.value);
+      offsetDisplay.textContent = (ms >= 0 ? '+' : '') + ms + ' ms';
+    });
   }
 
   // === ACCIONES ===
@@ -232,14 +253,25 @@
   }
 
   // === SINCRONIZACIÓN (via YouTube Player API en page-script.js) ===
+  // Auto-compensación: enviamos Date.now() como timestamp. Cuando el tab secundario
+  // recibe el mensaje, calcula cuánto tardó en llegar y adelanta por ese delay.
+  // Offset manual: el slider permite ajustar +/- 2 segundos a oído.
 
   async function syncTime() {
     const t = await ytGetTime();
+    const slider = document.getElementById('dc-offset-slider');
+    const manualOffsetMs = slider ? parseInt(slider.value) : 0;
+    const manualOffsetSec = manualOffsetMs / 1000;
+
     chrome.runtime.sendMessage({
       action: 'syncTime',
-      currentTime: t
+      currentTime: t + manualOffsetSec,
+      sentAt: Date.now()
     }, () => {
-      updateSyncStatus('Tiempo sincronizado: ' + formatTime(t));
+      const label = manualOffsetMs !== 0
+        ? formatTime(t) + ' (offset: ' + (manualOffsetMs >= 0 ? '+' : '') + manualOffsetMs + 'ms)'
+        : formatTime(t);
+      updateSyncStatus('Sincronizado: ' + label);
     });
   }
 
@@ -263,8 +295,15 @@
 
     switch (request.action) {
       case 'syncTime':
-        console.log('DualCast content: seek a', request.currentTime);
-        ytCmd('seek', { t: request.currentTime });
+        // Auto-compensación: calcular cuánto tardó el mensaje en llegar
+        var transitDelay = 0;
+        if (request.sentAt) {
+          transitDelay = (Date.now() - request.sentAt) / 1000;
+        }
+        var compensatedTime = request.currentTime + transitDelay;
+        console.log('DualCast content: seek a', compensatedTime.toFixed(2),
+          '(delay compensado:', (transitDelay * 1000).toFixed(0), 'ms)');
+        ytCmd('seek', { t: compensatedTime });
         sendResponse({ success: true });
         break;
 

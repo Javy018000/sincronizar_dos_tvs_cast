@@ -68,7 +68,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     // --- Sincronizar tiempo entre pestañas ---
     case 'syncTime':
-      sendToSecondTab({ action: 'syncTime', currentTime: request.currentTime });
+      sendToSecondTab({
+        action: 'syncTime',
+        currentTime: request.currentTime,
+        sentAt: request.sentAt
+      });
       sendResponse({ success: true });
       break;
 
