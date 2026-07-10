@@ -9,27 +9,36 @@
     <h1>YouTube Dual Cast</h1>
     <p class="subtitle">Transmite a dos TVs al mismo tiempo</p>
 
-    <div class="instructions">
-      <h2>Como usar:</h2>
-      <ol>
-        <li>Abre un video en <strong>YouTube</strong></li>
-        <li>Busca el boton con dos TVs en los controles del reproductor (abajo a la derecha)</li>
-        <li>Sigue los pasos del panel:
-          <ul>
-            <li><strong>Paso 1:</strong> Envia Cast al primer TV</li>
-            <li><strong>Paso 2:</strong> Abre ventana para el segundo TV</li>
-          </ul>
-        </li>
-        <li>Usa los controles de sincronizacion para mantener ambos TVs al mismo tiempo</li>
-      </ol>
-    </div>
-
     <div class="status">
       <span class="status-dot" id="status-dot"></span>
       <span id="status-text">Verificando...</span>
     </div>
 
-    <div class="footer">v1.0</div>
+    <div class="status" id="dual-status" style="display:none;">
+      <span class="status-dot active"></span>
+      <span>Sesión dual activa — sincronización en marcha</span>
+    </div>
+
+    <div class="instructions">
+      <h2>Cómo usar:</h2>
+      <ol>
+        <li>Abre un video en <strong>YouTube</strong></li>
+        <li>Pulsa el botón con dos TVs en los controles del reproductor (abajo a la derecha)</li>
+        <li>Sigue los pasos del panel:
+          <ul>
+            <li><strong>Paso 1:</strong> envía Cast al primer TV</li>
+            <li><strong>Paso 2:</strong> abre la ventana para el segundo TV</li>
+          </ul>
+        </li>
+        <li>El <strong>auto-sync</strong> corrige el desfase solo. Si el audio no coincide (TVs con distinta latencia), ajusta el slider <strong>a oído</strong> hasta que suenen a la vez</li>
+      </ol>
+    </div>
+
+    <div class="tip">
+      Consejo: si el TV 2 se oye con eco (va detrás), mueve el slider hacia <strong>+</strong>. Si se adelanta, hacia <strong>&minus;</strong>. El ajuste se guarda para la próxima vez.
+    </div>
+
+    <div class="footer">v2.0</div>
   </div>
   <script src="popup.js"></script>
 </body>

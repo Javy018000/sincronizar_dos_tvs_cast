@@ -1,0 +1,26 @@
+# Dependencias
+node_modules/
+package-lock.json
+
+# Artefactos de empaquetado de la extensión
+*.zip
+*.crx
+*.pem
+dist/
+build/
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editores / IDE
+.vscode/
+.idea/
+*.swp
+*~
+
+# Logs y temporales
+*.log
+npm-debug.log*
+.cache/
