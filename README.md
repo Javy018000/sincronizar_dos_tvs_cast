@@ -35,7 +35,8 @@ El reto real es el **audio**: dos TVs casi nunca reciben el stream con la misma 
 
 ### Sincronización
 
-- **Auto-sync** (activado por defecto): cada 3 segundos la extensión compara ambas reproducciones y corrige el desfase automáticamente. Puedes desactivarlo con el interruptor *auto*.
+- **Auto-sync inteligente** (activado por defecto): vigila el desfase en tiempo real (una muestra por segundo) y **solo corrige cuando hace falta de verdad** — decide con estadística, no con lecturas sueltas. Puedes desactivarlo con el interruptor *auto*.
+- **Modo estable (lock):** cuando la sincronía es buena, el sistema la protege — sube el umbral de corrección para no romper lo que ya suena bien.
 - **Sincronizar ahora / Pausar ambos / Reproducir ambos:** control manual inmediato.
 
 ### Ajuste de audio (lo importante)
@@ -53,10 +54,14 @@ Si el video va sincronizado pero el **sonido no coincide**, usa el slider **Ajus
 ## Características
 
 - ✅ Cast de un video a dos TVs desde una sola pestaña de origen.
-- 🔄 Sincronización automática continua con corrección de desfase por umbral.
-- 🔊 Ajuste de audio en vivo y persistente para TVs con distinta latencia.
+- 🧠 **Sync inteligente**: decide con la mediana de una ventana de muestras y la velocidad de deriva (regresión lineal), nunca con una lectura suelta.
+- 🔒 **Modo estable con histéresis**: si ya suena bien, no lo toca — solo un desfase grande y sostenido rompe el lock.
+- 📚 **Aprende de tus TVs**: mide dónde aterriza cada seek y compensa el sesgo en el siguiente (se guarda entre sesiones).
+- 🌊 **Corrección suave**: desfases pequeños se corrigen acelerando/frenando un instante el TV 2 (sin rebuffering ni corte de audio), con detección automática de si el TV lo soporta.
+- 🔊 Ajuste de audio en vivo y persistente para TVs con distinta latencia; mientras calibras a oído, las correcciones automáticas se congelan.
+- ⏩ Sincroniza también la velocidad de reproducción (si ves a 1.5x, el TV 2 va a 1.5x).
 - 📺 Detección de Cast en cascada: botón nativo de YouTube → CAF SDK → Cast SDK v2.
-- 🟢 Estado en tiempo real: muestra el nombre del TV conectado y el desfase actual.
+- 🟢 Estado en tiempo real: TV conectado, desfase actual y deriva en ms/min.
 - 🎬 Si cambias de video en la pestaña principal, el TV 2 carga el mismo video solo.
 - ♻️ Recuperación ante cierres de pestaña, recargas y reinicios del service worker.
 
@@ -72,7 +77,13 @@ Si el video va sincronizado pero el **sonido no coincide**, usa el slider **Ajus
 | `background.js` | Service worker: enruta mensajes entre la pestaña principal y la secundaria, y gestiona su ciclo de vida. |
 | `popup.html/js/css` | Popup del icono: estado de YouTube y de la sesión dual. |
 
-**Flujo de sincronización:** la pestaña **principal** envía cada 3 s su tiempo y estado de reproducción. La pestaña **secundaria** los compara con su propio reproductor y solo corrige (con `seekTo`) si el desfase supera 400 ms, con un *cooldown* de 5 s para no encadenar saltos mientras el TV aún está buscando. El offset de audio manual se suma a cada corrección para mantenerlo estable en el tiempo.
+**Motor de sincronización (v3):** la pestaña **principal** envía una muestra por segundo (tiempo, estado, velocidad). La **secundaria** mantiene una ventana deslizante de desfases y decide con la **mediana** y la **velocidad de deriva** (regresión lineal) — así el ruido de medición del Cast (la posición reportada es una estimación que se actualiza cada ~1 s) no dispara correcciones falsas. Correcciones:
+
+1. **Suave** (desfase < 1,2 s): acelera/frena el TV 2 un instante con `setPlaybackRate` — sin rebuffering. Si el TV no obedece, lo detecta y lo recuerda.
+2. **Seek** (desfases grandes): con compensación del **sesgo de aterrizaje aprendido** — tras cada seek mide dónde cayó de verdad y ajusta el siguiente.
+3. **Lock**: con sincronía estable, el umbral sube de 400 a 700 ms sostenidos — el sistema protege la calibración de audio que hiciste a oído en lugar de destruirla.
+
+El offset de audio manual se suma a cada muestra, y mientras mueves el slider las correcciones automáticas se congelan.
 
 ---
 

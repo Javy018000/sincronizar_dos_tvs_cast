@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "YouTube Dual Cast",
-  "version": "2.0",
-  "description": "Transmite un video de YouTube a dos TVs simultáneamente, con sincronización automática y ajuste de audio para TVs con distinta latencia",
+  "version": "3.0",
+  "description": "Transmite un video de YouTube a dos TVs simultáneamente, con sincronización inteligente que aprende de tus TVs y ajuste de audio para latencias distintas",
 
   "permissions": [
     "tabs",

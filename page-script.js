@@ -180,15 +180,25 @@
         } catch (err) {}
         break;
 
+      case 'setRate':
+        try {
+          if (p && p.setPlaybackRate) {
+            p.setPlaybackRate(e.data.rate);
+            console.log('DualCast page-script: playbackRate →', e.data.rate);
+          }
+        } catch (err) {}
+        break;
+
       // Estado completo del reproductor (con reqId para emparejar respuestas)
       case 'getState': {
-        var st = { t: 0, playerState: -1, videoId: null, duration: 0 };
+        var st = { t: 0, playerState: -1, videoId: null, duration: 0, playbackRate: 1 };
         try {
           if (p) {
             if (p.getCurrentTime) st.t = p.getCurrentTime();
             if (p.getPlayerState) st.playerState = p.getPlayerState();
             if (p.getDuration) st.duration = p.getDuration();
             if (p.getVideoData) st.videoId = (p.getVideoData() || {}).video_id || null;
+            if (p.getPlaybackRate) st.playbackRate = p.getPlaybackRate() || 1;
           }
         } catch (err) {}
         window.postMessage({ from: 'dc-page', cmd: 'state', reqId: e.data.reqId, state: st }, '*');

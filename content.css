@@ -402,10 +402,23 @@
 
 .dc-sync-status {
   font-size: 11px;
-  color: #4CAF50;
+  color: #999;
   margin: 8px 0 0 0;
   text-align: center;
   min-height: 16px;
+}
+
+/* Estados del motor de sync: verde = estable, azul = actuando, ámbar = espera */
+.dc-sync-status.dc-ss-ok {
+  color: #4CAF50;
+}
+
+.dc-sync-status.dc-ss-info {
+  color: #7aa7ff;
+}
+
+.dc-sync-status.dc-ss-warn {
+  color: #ffd700;
 }
 
 /* Notificación */

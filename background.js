@@ -118,6 +118,8 @@ async function handleMessage(request, sender) {
         offsetMs: request.offsetMs || 0,
         isPlaying: request.isPlaying,
         videoId: request.videoId,
+        playbackRate: request.playbackRate || 1,
+        calibrating: !!request.calibrating,
         force: !!request.force
       });
       if (r.ok) return { success: true, report: r.res };
